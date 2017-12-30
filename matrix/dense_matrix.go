@@ -11,6 +11,7 @@ type denseMatrix struct {
 // if r*c <= 0, it will panic. A uint32 slice is used as the underlying
 // storage and the data layout is in row major order, i.e. the (i*c + j)-th
 // element in the data slice is the [i, j]-th element in the matrix.
+// Vector is defined as a matrix one column, i.e. a column vector.
 func NewDenseMatrix(r, c uint32) *denseMatrix {
 	if r*c <= 0 {
 		panic(ErrIndexOutOfRange)
