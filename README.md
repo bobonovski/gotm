@@ -3,7 +3,7 @@ Implements some popular topic models in Go, including:
 
 ## TODO LIST
 * Latent Dirichlet Allocation
-  * Gibbs Sampling
+  * Collapsed Gibbs Sampling
   * Alias LDA
   * FTree LDA
   * Warp LDA

@@ -64,7 +64,8 @@ func (this *lda) Run(iter int) {
 			for kidx := uint32(0); kidx < this.topicNum; kidx += 1 {
 				docPart := this.alpha + float32(table.DocTopic.Get(doc, k))
 				wordPart := (this.beta + float32(table.WordTopic.Get(w, k))) /
-					(float32(table.WordTopicSum.Get(k, uint32(1))) + this.beta*float32(this.data.VocabSize))
+					(float32(table.WordTopicSum.Get(k, uint32(1))) +
+						this.beta*float32(this.data.VocabSize))
 				if kidx == 0 {
 					cumsum[kidx] = docPart * wordPart
 				} else {
