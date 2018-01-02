@@ -72,7 +72,7 @@ func (this *lda) Run(iter int) {
 					cumsum[kidx] = cumsum[kidx-1] + docPart*wordPart
 				}
 			}
-			u := rand.Float32() * cumsum[this.topicNum]
+			u := rand.Float32() * cumsum[this.topicNum-1]
 			for kidx := uint32(0); kidx < this.topicNum; kidx += 1 {
 				if u < cumsum[kidx] {
 					k = kidx
