@@ -42,7 +42,7 @@ func (this *Corpus) Load(fn string) {
 	if this.Docs == nil {
 		this.Docs = make(map[uint32][]*WordCount)
 	}
-	vocabMap := make(map[uint32]uint32)
+	vocabMaxId := uint32(0)
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
@@ -81,11 +81,13 @@ func (this *Corpus) Load(fn string) {
 				WordId: uint32(wordId),
 				Count:  uint32(count),
 			})
-			if _, ok := vocabMap[uint32(wordId)]; !ok {
-				vocabMap[uint32(wordId)] += uint32(count)
+			if uint32(wordId) > vocabMaxId {
+				vocabMaxId = uint32(wordId)
 			}
 		}
-
-		this.VocabSize = uint32(len(vocabMap))
 	}
+	this.VocabSize = vocabMaxId + 1
+
+	log.Printf("number of documents %d", this.DocNum)
+	log.Printf("vocabulary size %d", this.VocabSize)
 }

@@ -13,8 +13,8 @@ var (
 	topicModel = flag.String("model", "lda", "model type")
 	alpha      = flag.Float64("alpha", 0.01, "document-topic mixture hyperparameter")
 	beta       = flag.Float64("beta", 0.01, "topic-word mixture hyperparameter")
-	topicNum   = flag.Uint("topic_num", 50, "number of topics")
-	iteration  = flag.Int("iter_num", 10, "number of iteration")
+	topicNum   = flag.Uint("k", 20, "number of topics")
+	iteration  = flag.Int("iter", 10, "number of iteration")
 )
 
 func main() {
