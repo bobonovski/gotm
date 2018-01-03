@@ -6,4 +6,6 @@ type Matrix interface {
 	Set(uint32, uint32, uint32)
 	Incr(uint32, uint32, uint32)
 	Decr(uint32, uint32, uint32)
+	GetRow(uint32) []uint32
+	GetCol(uint32) []uint32
 }

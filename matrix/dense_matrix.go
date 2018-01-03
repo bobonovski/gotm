@@ -28,12 +28,38 @@ func (m *denseMatrix) Shape() (uint32, uint32) {
 	return m.nrow, m.ncol
 }
 
-// get the [r, c]-the element of the matrix
+// get the [r, c]-th element of the matrix
 func (m *denseMatrix) Get(r, c uint32) uint32 {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
 	return m.data[r*m.ncol+c]
+}
+
+// get the r-th row of the matrix
+func (m *denseMatrix) GetRow(r uint32) []uint32 {
+	if r >= m.nrow {
+		panic(ErrIndexOutOfRange)
+	}
+
+	var row []uint32
+	for c := uint32(0); c < m.ncol; c += 1 {
+		row = append(row, m.Get(r, c))
+	}
+	return row
+}
+
+// get the c-th column of the matrix
+func (m *denseMatrix) GetCol(c uint32) []uint32 {
+	if c >= m.ncol {
+		panic(ErrIndexOutOfRange)
+	}
+
+	var column []uint32
+	for r := uint32(0); r < m.nrow; r += 1 {
+		column = append(column, m.Get(r, c))
+	}
+	return column
 }
 
 // set val to the [r, c]-th element of the matrix
