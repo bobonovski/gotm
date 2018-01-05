@@ -1,4 +1,4 @@
-package table
+package sstable
 
 import "github.com/bobonovski/gotm/matrix"
 
