@@ -23,9 +23,9 @@ type lda struct {
 func NewLDA(dat *corpus.Corpus,
 	topicNum uint32, alpha float32, beta float32) *lda {
 	// init sufficient statistics table
-	table.WordTopic = matrix.NewDenseMatrix(dat.VocabSize, topicNum)
-	table.DocTopic = matrix.NewDenseMatrix(dat.DocNum, topicNum)
-	table.WordTopicSum = matrix.NewDenseMatrix(topicNum, uint32(1))
+	table.WordTopic = matrix.NewUint32Matrix(dat.VocabSize, topicNum)
+	table.DocTopic = matrix.NewUint32Matrix(dat.DocNum, topicNum)
+	table.WordTopicSum = matrix.NewUint32Matrix(topicNum, uint32(1))
 	table.DocWordTopic = make(map[table.DocWord]uint32)
 
 	return &lda{
@@ -108,8 +108,8 @@ func (this *lda) Run(iter int) {
 
 // compute the posterior point estimation of word-topic mixture
 // beta (Dirichlet prior) + data -> phi
-func (this *lda) Phi() *matrix.CacheMatrix {
-	phi := matrix.NewCacheMatrix(this.data.VocabSize, this.topicNum)
+func (this *lda) Phi() *matrix.Float32Matrix {
+	phi := matrix.NewFloat32Matrix(this.data.VocabSize, this.topicNum)
 
 	for k := uint32(0); k < this.topicNum; k += 1 {
 		sum := util.VectorSum(table.WordTopic.GetCol(k))
@@ -126,8 +126,8 @@ func (this *lda) Phi() *matrix.CacheMatrix {
 
 // compute the posterior point estimation of document-topic mixture
 // alpha (Dirichlet prior) + data -> theta
-func (this *lda) Theta() *matrix.CacheMatrix {
-	theta := matrix.NewCacheMatrix(this.data.DocNum, this.topicNum)
+func (this *lda) Theta() *matrix.Float32Matrix {
+	theta := matrix.NewFloat32Matrix(this.data.DocNum, this.topicNum)
 
 	for d := uint32(0); d < this.data.DocNum; d += 1 {
 		sum := util.VectorSum(table.DocTopic.GetRow(d))

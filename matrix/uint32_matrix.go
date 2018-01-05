@@ -1,22 +1,22 @@
 package matrix
 
-// internal dense matrix representation
-type denseMatrix struct {
+// internal Uint32 matrix representation
+type Uint32Matrix struct {
 	nrow uint32
 	ncol uint32
 	data []uint32
 }
 
-// NewDenseMatrix creates a new denseMatrix with r rows and c columns.
+// NewUint32Matrix creates a new Uint32Matrix with r rows and c columns.
 // if r*c <= 0, it will panic. A uint32 slice is used as the underlying
 // storage and the data layout is in row major order, i.e. the (i*c + j)-th
 // element in the data slice is the [i, j]-th element in the matrix.
 // Vector is defined as a matrix one column, i.e. a column vector.
-func NewDenseMatrix(r, c uint32) *denseMatrix {
+func NewUint32Matrix(r, c uint32) *Uint32Matrix {
 	if r*c <= 0 {
 		panic(ErrIndexOutOfRange)
 	}
-	return &denseMatrix{
+	return &Uint32Matrix{
 		nrow: r,
 		ncol: c,
 		data: make([]uint32, r*c),
@@ -24,12 +24,12 @@ func NewDenseMatrix(r, c uint32) *denseMatrix {
 }
 
 // get the shape of the matrix
-func (m *denseMatrix) Shape() (uint32, uint32) {
+func (m *Uint32Matrix) Shape() (uint32, uint32) {
 	return m.nrow, m.ncol
 }
 
 // get the [r, c]-th element of the matrix
-func (m *denseMatrix) Get(r, c uint32) uint32 {
+func (m *Uint32Matrix) Get(r, c uint32) uint32 {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
@@ -37,7 +37,7 @@ func (m *denseMatrix) Get(r, c uint32) uint32 {
 }
 
 // get the r-th row of the matrix
-func (m *denseMatrix) GetRow(r uint32) []uint32 {
+func (m *Uint32Matrix) GetRow(r uint32) []uint32 {
 	if r >= m.nrow {
 		panic(ErrIndexOutOfRange)
 	}
@@ -50,7 +50,7 @@ func (m *denseMatrix) GetRow(r uint32) []uint32 {
 }
 
 // get the c-th column of the matrix
-func (m *denseMatrix) GetCol(c uint32) []uint32 {
+func (m *Uint32Matrix) GetCol(c uint32) []uint32 {
 	if c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
@@ -63,7 +63,7 @@ func (m *denseMatrix) GetCol(c uint32) []uint32 {
 }
 
 // set val to the [r, c]-th element of the matrix
-func (m *denseMatrix) Set(r, c uint32, val uint32) {
+func (m *Uint32Matrix) Set(r, c uint32, val uint32) {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
@@ -71,7 +71,7 @@ func (m *denseMatrix) Set(r, c uint32, val uint32) {
 }
 
 // increment the [r, c]-th element of the matrix by val
-func (m *denseMatrix) Incr(r, c uint32, val uint32) {
+func (m *Uint32Matrix) Incr(r, c uint32, val uint32) {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
@@ -79,7 +79,7 @@ func (m *denseMatrix) Incr(r, c uint32, val uint32) {
 }
 
 // decrement the [r, c]-th element of the matrix by val
-func (m *denseMatrix) Decr(r, c uint32, val uint32) {
+func (m *Uint32Matrix) Decr(r, c uint32, val uint32) {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
