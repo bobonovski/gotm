@@ -23,7 +23,11 @@ type lda struct {
 func NewLDA(dat *corpus.Corpus,
 	topicNum uint32, alpha float32, beta float32) *lda {
 	// init sufficient statistics table
-	table.Init(topicNum, dat.VocabSize, dat.DocNum)
+	table.WordTopic = matrix.NewDenseMatrix(dat.VocabSize, topicNum)
+	table.DocTopic = matrix.NewDenseMatrix(dat.DocNum, topicNum)
+	table.WordTopicSum = matrix.NewDenseMatrix(topicNum, uint32(1))
+	table.DocWordTopic = make(map[table.DocWord]uint32)
+
 	return &lda{
 		data:     dat,
 		alpha:    alpha,
