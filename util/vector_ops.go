@@ -8,3 +8,11 @@ func VectorSum(data []uint32) uint32 {
 	}
 	return sum
 }
+
+func Float32VectorSum(data []float32) float32 {
+	sum := float32(0.0)
+	for _, d := range data {
+		sum += d
+	}
+	return sum
+}

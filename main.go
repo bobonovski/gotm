@@ -29,6 +29,8 @@ func main() {
 	switch *topicModel {
 	case "lda":
 		m = model.NewLDA(data, uint32(*topicNum), float32(*alpha), float32(*beta))
+	case "sparselda":
+		m = model.NewSparseLDA(data, uint32(*topicNum), float32(*alpha), float32(*beta))
 	default:
 		log.Printf("not supported yet")
 	}
