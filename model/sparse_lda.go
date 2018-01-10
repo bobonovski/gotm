@@ -137,7 +137,7 @@ func (this *sparseLda) Run(iter int) {
 					cumsum = 0.0
 					for tcIdx, _ := range sstable.WordTopicMap.Data[w] {
 						tid, count := sstable.WordTopicMap.Get(w, tcIdx)
-						cumsum += wtbCache[tid] + float32(count)
+						cumsum += wtbCache[tid] * float32(count)
 						if cumsum >= u {
 							k = tid
 							break
@@ -192,12 +192,17 @@ func (this *sparseLda) Phi() *matrix.Float32Matrix {
 	phi := matrix.NewFloat32Matrix(this.data.VocabSize, this.topicNum)
 
 	for w := uint32(0); w < this.data.VocabSize; w += 1 {
+		// convert sparse vector to dense vector
+		wordTopicCount := make([]uint32, this.topicNum)
 		for tcIdx, _ := range sstable.WordTopicMap.Data[w] {
 			topicId, count := sstable.WordTopicMap.Get(w, tcIdx)
-			result := (float32(count) + this.beta) /
-				(float32(sstable.WordTopicSum.Get(topicId, uint32(0))) +
+			wordTopicCount[topicId] = count
+		}
+		for k := uint32(0); k < this.topicNum; k += 1 {
+			result := (float32(wordTopicCount[k]) + this.beta) /
+				(float32(sstable.WordTopicSum.Get(k, uint32(0))) +
 					float32(this.data.VocabSize)*this.beta)
-			phi.Set(w, topicId, result)
+			phi.Set(w, k, result)
 		}
 	}
 
