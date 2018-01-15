@@ -245,3 +245,18 @@ func (this *sparseLda) Likelihood() float64 {
 
 	return sum
 }
+
+// save model to file
+func (this *sparseLda) SaveModel(fn string) error {
+	// serialize word-topic distribution
+	phi := this.Phi()
+	if err := phi.Serialize(fn + ".phi"); err != nil {
+		return err
+	}
+	// serialize document-topic distribution
+	theta := this.Theta()
+	if err := theta.Serialize(fn + ".theta"); err != nil {
+		return err
+	}
+	return nil
+}
