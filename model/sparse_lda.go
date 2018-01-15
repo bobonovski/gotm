@@ -215,7 +215,7 @@ func (this *sparseLda) Theta() *matrix.Float32Matrix {
 	theta := matrix.NewFloat32Matrix(this.data.DocNum, this.topicNum)
 
 	for d := uint32(0); d < this.data.DocNum; d += 1 {
-		sum := util.VectorSum(sstable.DocTopic.GetRow(d))
+		sum := util.Uint32VectorSum(sstable.DocTopic.GetRow(d))
 
 		for k := uint32(0); k < this.topicNum; k += 1 {
 			result := (float32(sstable.DocTopic.Get(d, k)) + this.alpha) /

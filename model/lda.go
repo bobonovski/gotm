@@ -112,7 +112,7 @@ func (this *lda) Phi() *matrix.Float32Matrix {
 	phi := matrix.NewFloat32Matrix(this.data.VocabSize, this.topicNum)
 
 	for k := uint32(0); k < this.topicNum; k += 1 {
-		sum := util.VectorSum(sstable.WordTopic.GetCol(k))
+		sum := util.Uint32VectorSum(sstable.WordTopic.GetCol(k))
 
 		for v := uint32(0); v < this.data.VocabSize; v += 1 {
 			result := (float32(sstable.WordTopic.Get(v, k)) + this.beta) /
@@ -130,7 +130,7 @@ func (this *lda) Theta() *matrix.Float32Matrix {
 	theta := matrix.NewFloat32Matrix(this.data.DocNum, this.topicNum)
 
 	for d := uint32(0); d < this.data.DocNum; d += 1 {
-		sum := util.VectorSum(sstable.DocTopic.GetRow(d))
+		sum := util.Uint32VectorSum(sstable.DocTopic.GetRow(d))
 
 		for k := uint32(0); k < this.topicNum; k += 1 {
 			result := (float32(sstable.DocTopic.Get(d, k)) + this.alpha) /
