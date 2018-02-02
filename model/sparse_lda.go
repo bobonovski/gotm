@@ -38,7 +38,7 @@ func NewSparseLDA(dat *corpus.Corpus,
 	}
 }
 
-func (this *sparseLda) Run(iter int) {
+func (this *sparseLda) Train(iter int) {
 	// randomly assign topic to word
 	rand.Seed(time.Now().Unix())
 	dw := sstable.DocWord{}
@@ -186,6 +186,9 @@ func (this *sparseLda) Run(iter int) {
 	}
 }
 
+// infer topics on new documents
+func (this *sparseLda) Infer(iter int) {}
+
 // compute the posterior point estimation of word-topic mixture
 // beta (Dirichlet prior) + data -> phi
 func (this *sparseLda) Phi() *matrix.Float32Matrix {
@@ -246,16 +249,35 @@ func (this *sparseLda) Likelihood() float64 {
 	return sum
 }
 
-// save model to file
-func (this *sparseLda) SaveModel(fn string) error {
-	// serialize word-topic distribution
+// serialize word-topic distribution
+func (this *sparseLda) SavePhi(fn string) error {
 	phi := this.Phi()
 	if err := phi.Serialize(fn + ".phi"); err != nil {
 		return err
 	}
-	// serialize document-topic distribution
+	return nil
+}
+
+// serialize document-topic distribution
+func (this *sparseLda) SaveTheta(fn string) error {
 	theta := this.Theta()
 	if err := theta.Serialize(fn + ".theta"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// serialize word-topic matrix
+func (this *sparseLda) SaveWordTopic(fn string) error {
+	if err := sstable.WordTopicMap.Serialize(fn + ".wt"); err != nil {
+		return err
+	}
+	return nil
+}
+
+// deserialize word-topic matrix
+func (this *sparseLda) LoadWordTopic(fn string) error {
+	if err := sstable.WordTopicMap.Deserialize(fn + ".wt"); err != nil {
 		return err
 	}
 	return nil

@@ -1,1 +1,5 @@
 gotm
+train.txt
+lda_model.phi
+lda_model.theta
+lda_model.wt
