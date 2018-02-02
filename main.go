@@ -16,12 +16,13 @@ var (
 	topicNum  = flag.Uint("k", 20, "number of topics")
 	iteration = flag.Int("iter", 10, "number of iteration")
 	modelName = flag.String("model_file", "lda_model", "input/output model name")
+	infer     = flag.Bool("infer", false, "whether do inference on input file")
 )
 
 func main() {
 	flag.Parse()
 
-	// read training data
+	// load documents for training or inference
 	data := &corpus.Corpus{}
 	data.Load(*input)
 
@@ -36,9 +37,21 @@ func main() {
 		log.Printf("not supported yet")
 	}
 
-	// run model
-	m.Run(*iteration)
-
-	// save model
-	m.SaveModel(*modelName)
+	if *infer == false {
+		// train model
+		m.Train(*iteration)
+		// save document-topic distribution
+		m.SaveTheta(*modelName)
+		// save word-topic distribution
+		m.SavePhi(*modelName)
+		// save word-topic matrix
+		m.SaveWordTopic(*modelName)
+	} else {
+		// load word-topic matrix
+		m.LoadWordTopic(*modelName)
+		// infer document topics
+		m.Infer(*iteration)
+		// save document-topic distribution
+		m.SaveTheta(*modelName)
+	}
 }

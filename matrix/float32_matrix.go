@@ -71,7 +71,7 @@ func (m *Float32Matrix) Serialize(fn string) error {
 		for cidx := uint32(0); cidx < c; cidx += 1 {
 			val = m.Get(ridx, cidx)
 			if val > 0 { // only write out nonzero value
-				out.WriteString(fmt.Sprintf("%d,%d,%f\n", ridx, cidx, val))
+				out.WriteString(fmt.Sprintf("%d,%d,%e\n", ridx, cidx, val))
 			}
 		}
 	}
@@ -122,7 +122,7 @@ func (m *Float32Matrix) Deserialize(fn string) error {
 		if err != nil {
 			return err
 		}
-		val, err := strconv.ParseFloat(value[0], 32)
+		val, err := strconv.ParseFloat(value[2], 32)
 		if err != nil {
 			return err
 		}
