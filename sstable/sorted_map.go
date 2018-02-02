@@ -1,15 +1,24 @@
 package sstable
 
 import (
+	"bufio"
+	"errors"
+	"fmt"
+	"log"
 	"math/bits"
+	"os"
+	"strconv"
+	"strings"
 
 	"github.com/bobonovski/gotm/matrix"
 )
 
 type SortedMap struct {
-	Data      map[uint32][]uint32
-	RotateLen uint32
-	TopicMask uint32
+	Data       map[uint32][]uint32
+	RotateLen  uint32
+	TopicMask  uint32
+	MaxWordId  uint32
+	MaxTopicId uint32
 }
 
 func NewSortedMap(topicNum uint32) *SortedMap {
@@ -30,6 +39,93 @@ var (
 	// count number
 	WordTopicMap *SortedMap
 )
+
+// serialize data to file
+func (this *SortedMap) Serialize(fn string) error {
+	out, err := os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, os.ModePerm)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	if len(this.Data) == 0 {
+		return nil
+	}
+
+	// write the matrix shape
+	out.WriteString(fmt.Sprintf("%d,%d\n",
+		this.MaxWordId+uint32(1), this.MaxTopicId+uint32(1)))
+
+	for w := uint32(0); w <= this.MaxWordId; w += 1 {
+		for i, _ := range this.Data[w] {
+			topicId, count := this.Get(w, i)
+			out.WriteString(fmt.Sprintf("%d,%d,%d\n", w, topicId, count))
+		}
+	}
+	return nil
+}
+
+// deserialize data from file
+func (this *SortedMap) Deserialize(fn string) error {
+	file, err := os.Open(fn)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	var lineIdx int
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		if lineIdx == 0 {
+			shape := strings.Split(txt, ",")
+			if len(shape) != 0 {
+				return errors.New("model corrupted, shape not found")
+			}
+			row, err := strconv.ParseUint(shape[0], 10, 32)
+			if err != nil {
+				return err
+			}
+			col, err := strconv.ParseUint(shape[1], 10, 32)
+			if err != nil {
+				return err
+			}
+			this.MaxWordId = uint32(row) - uint32(1)
+			this.MaxTopicId = uint32(col) - uint32(1)
+			continue
+		}
+
+		value := strings.Split(txt, ",")
+		if len(value) != 3 {
+			log.Printf("data corrupted, row %d, data %s",
+				lineIdx, txt)
+			continue
+		}
+		ridx, err := strconv.ParseUint(value[0], 10, 32)
+		if err != nil {
+			return err
+		}
+		cidx, err := strconv.ParseUint(value[1], 10, 32)
+		if err != nil {
+			return err
+		}
+		val, err := strconv.ParseUint(value[2], 10, 32)
+		if err != nil {
+			return err
+		}
+
+		this.Incr(uint32(ridx), uint32(cidx), uint32(val))
+
+		lineIdx += 1
+	}
+
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	return nil
+}
 
 // get the i-th element of the value slice of wordId and return
 // parsed value of topicId and count
@@ -55,6 +151,12 @@ func (this *SortedMap) Incr(wordId uint32, topicId uint32, count uint32) {
 		}
 	}
 	if idx == -1 {
+		if wordId > this.MaxWordId {
+			this.MaxWordId = wordId
+		}
+		if topicId > this.MaxTopicId {
+			this.MaxTopicId = topicId
+		}
 		this.Data[wordId] = append(this.Data[wordId],
 			(count<<this.RotateLen)+topicId)
 		for k := len(this.Data[wordId]) - 1; k > 0; k -= 1 {
