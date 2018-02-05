@@ -1,4 +1,4 @@
-package matrix
+package sstable
 
 import (
 	"bufio"

@@ -27,15 +27,11 @@ func main() {
 	data.Load(*input)
 
 	// init model
-	var m model.Model
-	switch *modelType {
-	case "lda":
-		m = model.NewLDA(data, uint32(*topicNum), float32(*alpha), float32(*beta))
-	case "sparselda":
-		m = model.NewSparseLDA(data, uint32(*topicNum), float32(*alpha), float32(*beta))
-	default:
-		log.Printf("not supported yet")
+	ctor, err := model.GetModel(*modelType)
+	if err != nil {
+		log.Fatal(err)
 	}
+	m := ctor(data, uint32(*topicNum), float32(*alpha), float32(*beta))
 
 	if *infer == false {
 		// train model

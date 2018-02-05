@@ -7,36 +7,41 @@ import (
 	"time"
 
 	"github.com/bobonovski/gotm/corpus"
-	"github.com/bobonovski/gotm/matrix"
 	"github.com/bobonovski/gotm/sstable"
-	"github.com/bobonovski/gotm/util"
 )
 
-type lda struct {
+func init() {
+	Register("lda", NewLDA)
+}
+
+type LDA struct {
 	data     *corpus.Corpus
 	alpha    float32 // document topic mixture hyperparameter
 	beta     float32 // topic word mixture hyperparameter
 	topicNum uint32
+
+	wt  *sstable.Uint32Matrix      // word-topic count table
+	dt  *sstable.Uint32Matrix      // doc-topic count table
+	wts *sstable.Uint32Matrix      // word-topic-sum count table
+	dwt map[sstable.DocWord]uint32 // doc-word-topic map
 }
 
-// NewLDA creates a lda instance with collapsed gibbs sampler
+// New creates a LDA instance with collapsed gibbs sampler
 func NewLDA(dat *corpus.Corpus,
-	topicNum uint32, alpha float32, beta float32) *lda {
-	// init sufficient statistics sstable
-	sstable.WordTopic = matrix.NewUint32Matrix(dat.VocabSize, topicNum)
-	sstable.DocTopic = matrix.NewUint32Matrix(dat.DocNum, topicNum)
-	sstable.WordTopicSum = matrix.NewUint32Matrix(topicNum, uint32(1))
-	sstable.DocWordTopic = make(map[sstable.DocWord]uint32)
-
-	return &lda{
+	topicNum uint32, alpha float32, beta float32) Model {
+	return &LDA{
 		data:     dat,
 		alpha:    alpha,
 		beta:     beta,
 		topicNum: topicNum,
+		wt:       sstable.NewUint32Matrix(dat.VocabSize, topicNum),
+		dt:       sstable.NewUint32Matrix(dat.DocNum, topicNum),
+		wts:      sstable.NewUint32Matrix(topicNum, uint32(1)),
+		dwt:      make(map[sstable.DocWord]uint32),
 	}
 }
 
-func (this *lda) Train(iter int) {
+func (this *LDA) Init() {
 	// randomly assign topic to word
 	rand.Seed(time.Now().Unix())
 	dw := sstable.DocWord{}
@@ -46,17 +51,21 @@ func (this *lda) Train(iter int) {
 			k := uint32(rand.Int31n(int32(this.topicNum)))
 
 			// update sufficient statistics
-			sstable.WordTopic.Incr(w, k, uint32(1))
-			sstable.DocTopic.Incr(doc, k, uint32(1))
-			sstable.WordTopicSum.Incr(k, uint32(0), uint32(1))
+			this.wt.Incr(w, k, uint32(1))
+			this.dt.Incr(doc, k, uint32(1))
+			this.wts.Incr(k, uint32(0), uint32(1))
 
 			// update doc word topic assignment
 			dw.DocId = doc
 			dw.WordIdx = uint32(i)
-			sstable.DocWordTopic[dw] = k
+			this.dwt[dw] = k
 		}
 	}
+}
 
+func (this *LDA) Train(iter int) {
+	this.Init()
+	dw := sstable.DocWord{}
 	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
 		if iterIdx%10 == 0 {
 			log.Printf("iter %5d, likelihood %f", iterIdx, this.Likelihood())
@@ -69,18 +78,18 @@ func (this *lda) Train(iter int) {
 				// get the current topic of word w
 				dw.DocId = doc
 				dw.WordIdx = uint32(i)
-				k := sstable.DocWordTopic[dw]
+				k := this.dwt[dw]
 
 				// decrease corresponding sufficient statistics
-				sstable.WordTopic.Decr(w, k, uint32(1))
-				sstable.DocTopic.Decr(doc, k, uint32(1))
-				sstable.WordTopicSum.Decr(k, uint32(0), uint32(1))
+				this.wt.Decr(w, k, uint32(1))
+				this.dt.Decr(doc, k, uint32(1))
+				this.wts.Decr(k, uint32(0), uint32(1))
 
 				// resample the topic
 				for kidx := uint32(0); kidx < this.topicNum; kidx += 1 {
-					docPart := this.alpha + float32(sstable.DocTopic.Get(doc, kidx))
-					wordPart := (this.beta + float32(sstable.WordTopic.Get(w, kidx))) /
-						(float32(sstable.WordTopicSum.Get(kidx, uint32(0))) +
+					docPart := this.alpha + float32(this.dt.Get(doc, kidx))
+					wordPart := (this.beta + float32(this.wt.Get(w, kidx))) /
+						(float32(this.wts.Get(kidx, uint32(0))) +
 							this.beta*float32(this.data.VocabSize))
 					if kidx == 0 {
 						cumsum[kidx] = docPart * wordPart
@@ -97,28 +106,28 @@ func (this *lda) Train(iter int) {
 				}
 
 				// increase corresponding sufficient statistics
-				sstable.WordTopic.Incr(w, k, uint32(1))
-				sstable.DocTopic.Incr(doc, k, uint32(1))
-				sstable.WordTopicSum.Incr(k, uint32(0), uint32(1))
-				sstable.DocWordTopic[dw] = k
+				this.wt.Incr(w, k, uint32(1))
+				this.dt.Incr(doc, k, uint32(1))
+				this.wts.Incr(k, uint32(0), uint32(1))
+				this.dwt[dw] = k
 			}
 		}
 	}
 }
 
 // infer topics on new documents
-func (this *lda) Infer(iter int) {}
+func (this *LDA) Infer(iter int) {}
 
 // compute the posterior point estimation of word-topic mixture
 // beta (Dirichlet prior) + data -> phi
-func (this *lda) Phi() *matrix.Float32Matrix {
-	phi := matrix.NewFloat32Matrix(this.data.VocabSize, this.topicNum)
+func (this *LDA) Phi() *sstable.Float32Matrix {
+	phi := sstable.NewFloat32Matrix(this.data.VocabSize, this.topicNum)
 
 	for k := uint32(0); k < this.topicNum; k += 1 {
-		sum := util.Uint32VectorSum(sstable.WordTopic.GetCol(k))
+		sum := sstable.Uint32VectorSum(this.wt.GetCol(k))
 
 		for v := uint32(0); v < this.data.VocabSize; v += 1 {
-			result := (float32(sstable.WordTopic.Get(v, k)) + this.beta) /
+			result := (float32(this.wt.Get(v, k)) + this.beta) /
 				(float32(sum) + float32(this.data.VocabSize)*this.beta)
 			phi.Set(v, k, result)
 		}
@@ -129,14 +138,14 @@ func (this *lda) Phi() *matrix.Float32Matrix {
 
 // compute the posterior point estimation of document-topic mixture
 // alpha (Dirichlet prior) + data -> theta
-func (this *lda) Theta() *matrix.Float32Matrix {
-	theta := matrix.NewFloat32Matrix(this.data.DocNum, this.topicNum)
+func (this *LDA) Theta() *sstable.Float32Matrix {
+	theta := sstable.NewFloat32Matrix(this.data.DocNum, this.topicNum)
 
 	for d := uint32(0); d < this.data.DocNum; d += 1 {
-		sum := util.Uint32VectorSum(sstable.DocTopic.GetRow(d))
+		sum := sstable.Uint32VectorSum(this.dt.GetRow(d))
 
 		for k := uint32(0); k < this.topicNum; k += 1 {
-			result := (float32(sstable.DocTopic.Get(d, k)) + this.alpha) /
+			result := (float32(this.dt.Get(d, k)) + this.alpha) /
 				(float32(sum) + float32(this.topicNum)*this.alpha)
 			theta.Set(d, k, result)
 		}
@@ -146,7 +155,7 @@ func (this *lda) Theta() *matrix.Float32Matrix {
 }
 
 // compute the joint likelihood of corpus
-func (this *lda) Likelihood() float64 {
+func (this *LDA) Likelihood() float64 {
 	phi := this.Phi()
 	theta := this.Theta()
 
@@ -165,7 +174,7 @@ func (this *lda) Likelihood() float64 {
 }
 
 // serialize word-topic distribution
-func (this *lda) SavePhi(fn string) error {
+func (this *LDA) SavePhi(fn string) error {
 	phi := this.Phi()
 	if err := phi.Serialize(fn + ".phi"); err != nil {
 		return err
@@ -174,7 +183,7 @@ func (this *lda) SavePhi(fn string) error {
 }
 
 // serialize document-topic distribution
-func (this *lda) SaveTheta(fn string) error {
+func (this *LDA) SaveTheta(fn string) error {
 	theta := this.Theta()
 	if err := theta.Serialize(fn + ".theta"); err != nil {
 		return err
@@ -183,16 +192,16 @@ func (this *lda) SaveTheta(fn string) error {
 }
 
 // serialize word-topic matrix
-func (this *lda) SaveWordTopic(fn string) error {
-	if err := sstable.WordTopic.Serialize(fn + ".wt"); err != nil {
+func (this *LDA) SaveWordTopic(fn string) error {
+	if err := this.wt.Serialize(fn + ".wt"); err != nil {
 		return err
 	}
 	return nil
 }
 
 // deserialize word-topic matrix
-func (this *lda) LoadWordTopic(fn string) error {
-	if err := sstable.WordTopic.Deserialize(fn + ".wt"); err != nil {
+func (this *LDA) LoadWordTopic(fn string) error {
+	if err := this.wt.Deserialize(fn + ".wt"); err != nil {
 		return err
 	}
 	return nil

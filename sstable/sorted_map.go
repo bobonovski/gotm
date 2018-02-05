@@ -9,8 +9,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/bobonovski/gotm/matrix"
 )
 
 type SortedMap struct {
@@ -131,7 +129,7 @@ func (this *SortedMap) Deserialize(fn string) error {
 // parsed value of topicId and count
 func (this *SortedMap) Get(wordId uint32, idx int) (uint32, uint32) {
 	if idx > len(this.Data[wordId]) {
-		panic(matrix.ErrIndexOutOfRange)
+		panic(ErrIndexOutOfRange)
 	}
 	count := this.Data[wordId][idx] >> this.RotateLen
 	topicId := this.Data[wordId][idx] & this.TopicMask

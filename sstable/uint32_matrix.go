@@ -1,4 +1,4 @@
-package matrix
+package sstable
 
 import (
 	"bufio"
@@ -9,6 +9,17 @@ import (
 	"strconv"
 	"strings"
 )
+
+var (
+	ErrIndexOutOfRange = errors.New("matrix: index out of range")
+	ErrBadShape        = errors.New("matrix: non-positive dimension not allowed")
+)
+
+// key-value pair util
+type DocWord struct {
+	DocId   uint32
+	WordIdx uint32
+}
 
 // internal Uint32 matrix representation
 type Uint32Matrix struct {
