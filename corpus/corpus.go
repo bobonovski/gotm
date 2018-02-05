@@ -2,10 +2,11 @@ package corpus
 
 import (
 	"bufio"
-	"log"
 	"os"
 	"strconv"
 	"strings"
+
+	log "github.com/golang/glog"
 )
 
 type Corpus struct {
@@ -29,6 +30,16 @@ func ExpandWords(wcs []*WordCount) []uint32 {
 	return words
 }
 
+// add one document to corpus with specified docId and word count
+// list, if the specified docId already exists in corpus, the old
+// doc will be overwritted
+func (this *Corpus) AddDoc(docId uint32, wcs []*WordCount) {
+	if _, ok := this.Docs[docId]; ok {
+		log.Warningf("document %d already exists, will be overwrite")
+	}
+	this.Docs[docId] = wcs
+}
+
 // load training data from file, the file format should be like:
 // [docId wordId:wordCount wordId:wordCount ... wordId:wordCount]
 // the function will panic if docId, wordId and wordCount cannot
@@ -49,7 +60,7 @@ func (this *Corpus) Load(fn string) {
 		doc := scanner.Text()
 		vals := strings.Split(doc, " ")
 		if len(vals) < 2 {
-			log.Printf("bad document: %s", doc)
+			log.Warningf("bad document: %s", doc)
 			continue
 		}
 
@@ -63,7 +74,7 @@ func (this *Corpus) Load(fn string) {
 		for _, kv := range vals[1:] {
 			wc := strings.Split(kv, ":")
 			if len(wc) != 2 {
-				log.Printf("bad word count: %s", kv)
+				log.Warningf("bad word count: %s", kv)
 				continue
 			}
 
@@ -88,6 +99,6 @@ func (this *Corpus) Load(fn string) {
 	}
 	this.VocabSize = vocabMaxId + 1
 
-	log.Printf("number of documents %d", this.DocNum)
-	log.Printf("vocabulary size %d", this.VocabSize)
+	log.Infof("number of documents %d", this.DocNum)
+	log.Infof("vocabulary size %d", this.VocabSize)
 }

@@ -2,7 +2,8 @@ package main
 
 import (
 	"flag"
-	"log"
+
+	log "github.com/golang/glog"
 
 	"github.com/bobonovski/gotm/corpus"
 	"github.com/bobonovski/gotm/model"
@@ -34,6 +35,7 @@ func main() {
 	m := ctor(data, uint32(*topicNum), float32(*alpha), float32(*beta))
 
 	if *infer == false {
+		log.Infof("training for new %s model", *modelType)
 		// train model
 		m.Train(*iteration)
 		// save document-topic distribution
@@ -43,6 +45,7 @@ func main() {
 		// save word-topic matrix
 		m.SaveWordTopic(*modelName)
 	} else {
+		log.Infof("infer for new docs")
 		// load word-topic matrix
 		m.LoadWordTopic(*modelName)
 		// infer document topics

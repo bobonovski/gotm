@@ -1,10 +1,11 @@
 package model
 
 import (
-	"log"
 	"math"
 	"math/rand"
 	"time"
+
+	log "github.com/golang/glog"
 
 	"github.com/bobonovski/gotm/corpus"
 	"github.com/bobonovski/gotm/sstable"
@@ -68,7 +69,7 @@ func (this *LDA) Train(iter int) {
 	dw := sstable.DocWord{}
 	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
 		if iterIdx%10 == 0 {
-			log.Printf("iter %5d, likelihood %f", iterIdx, this.Likelihood())
+			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
 		}
 
 		// collapsed gibbs sampling
@@ -116,7 +117,9 @@ func (this *LDA) Train(iter int) {
 }
 
 // infer topics on new documents
-func (this *LDA) Infer(iter int) {}
+func (this *LDA) Infer(iter int) {
+	this.Train(iter)
+}
 
 // compute the posterior point estimation of word-topic mixture
 // beta (Dirichlet prior) + data -> phi

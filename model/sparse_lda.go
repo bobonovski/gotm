@@ -1,9 +1,10 @@
 package model
 
 import (
-	"log"
 	"math"
 	"math/rand"
+
+	log "github.com/golang/glog"
 
 	"github.com/bobonovski/gotm/corpus"
 	"github.com/bobonovski/gotm/sstable"
@@ -55,7 +56,7 @@ func (this *SparseLDA) Train(iter int) {
 	wtbCache := make([]float32, this.topicNum)
 	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
 		if iterIdx%10 == 0 {
-			log.Printf("iter %5d, likelihood %f", iterIdx, this.Likelihood())
+			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
 		}
 
 		// fast sparse gibbs sampling
@@ -159,6 +160,11 @@ func (this *SparseLDA) Train(iter int) {
 			}
 		}
 	}
+}
+
+// infer topics on new documents
+func (this *SparseLDA) Infer(iter int) {
+	this.Train(iter)
 }
 
 // compute the posterior point estimation of word-topic mixture
