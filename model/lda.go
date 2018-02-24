@@ -42,6 +42,10 @@ func NewLDA(dat *corpus.Corpus,
 	}
 }
 
+func (this *LDA) SetCorpus(dat *corpus.Corpus) {
+	this.data = dat
+}
+
 func (this *LDA) Init() {
 	// randomly assign topic to word
 	rand.Seed(time.Now().Unix())
