@@ -220,7 +220,7 @@ func (this *SparseLDA) Likelihood() float64 {
 
 // serialize word-topic matrix
 func (this *SparseLDA) SaveWordTopic(fn string) error {
-	if err := this.wtm.Serialize(fn + ".wt"); err != nil {
+	if err := this.wtm.Serialize(fn); err != nil {
 		return err
 	}
 	return nil
@@ -228,7 +228,7 @@ func (this *SparseLDA) SaveWordTopic(fn string) error {
 
 // deserialize word-topic matrix
 func (this *SparseLDA) LoadWordTopic(fn string) error {
-	if err := this.wtm.Deserialize(fn + ".wt"); err != nil {
+	if err := this.wtm.Deserialize(fn); err != nil {
 		return err
 	}
 	return nil
