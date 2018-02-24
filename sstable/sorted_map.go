@@ -72,6 +72,7 @@ func (this *SortedMap) Deserialize(fn string) error {
 	defer file.Close()
 
 	var lineIdx int
+	var tmp *SortedMap
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
@@ -89,8 +90,9 @@ func (this *SortedMap) Deserialize(fn string) error {
 			if err != nil {
 				return err
 			}
-			this.MaxWordId = uint32(row) - uint32(1)
-			this.MaxTopicId = uint32(col) - uint32(1)
+			tmp = NewSortedMap(uint32(row))
+			tmp.MaxWordId = uint32(row) - uint32(1)
+			tmp.MaxTopicId = uint32(col) - uint32(1)
 			continue
 		}
 
@@ -113,7 +115,7 @@ func (this *SortedMap) Deserialize(fn string) error {
 			return err
 		}
 
-		this.Incr(uint32(ridx), uint32(cidx), uint32(val))
+		tmp.Incr(uint32(ridx), uint32(cidx), uint32(val))
 
 		lineIdx += 1
 	}
@@ -121,6 +123,8 @@ func (this *SortedMap) Deserialize(fn string) error {
 	if err := scanner.Err(); err != nil {
 		return err
 	}
+
+	this = tmp
 
 	return nil
 }
