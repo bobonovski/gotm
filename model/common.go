@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/bobonovski/gotm/corpus"
+	"github.com/bobonovski/gotm/sstable"
 )
 
 var constructors = make(map[string]ModelCtor)
@@ -14,6 +15,10 @@ type Model interface {
 	Train(iter int)
 	// do inference for new doc for iter iteration
 	Infer(iter int)
+	// get doc-topic distribution
+	Phi() *sstable.Float32Matrix
+	// get word-topic distribution
+	Theta() *sstable.Float32Matrix
 	// serialize posterior document topic distribution
 	SaveTheta(fn string) error
 	// serialize posterior word topic distribution
