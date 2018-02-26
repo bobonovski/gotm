@@ -162,6 +162,7 @@ func (m *Uint32Matrix) Deserialize(fn string) error {
 				return err
 			}
 			tmp = NewUint32Matrix(uint32(row), uint32(col))
+			lineIdx += 1
 			continue
 		}
 

@@ -85,7 +85,7 @@ func (m *Float32Matrix) Deserialize(fn string) error {
 	}
 	defer file.Close()
 
-	var lineIdx int
+	lineIdx := 0
 	var tmp *Float32Matrix
 
 	scanner := bufio.NewScanner(file)
@@ -105,6 +105,7 @@ func (m *Float32Matrix) Deserialize(fn string) error {
 				return err
 			}
 			tmp = NewFloat32Matrix(uint32(row), uint32(col))
+			lineIdx += 1
 			continue
 		}
 
