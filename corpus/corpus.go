@@ -34,8 +34,11 @@ func ExpandWords(wcs []*WordCount) []uint32 {
 // list, if the specified docId already exists in corpus, the old
 // doc will be overwritted
 func (this *Corpus) AddDoc(docId uint32, wcs []*WordCount) {
+	if this.Docs == nil {
+		this.Docs = make(map[uint32][]*WordCount)
+	}
 	if _, ok := this.Docs[docId]; ok {
-		log.Warningf("document %d already exists, will be overwrite")
+		log.Warningf("document %d already exists, associated value will be overwritten")
 	}
 	this.Docs[docId] = wcs
 }
