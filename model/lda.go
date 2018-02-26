@@ -72,7 +72,7 @@ func (this *LDA) Train(iter int) {
 	this.Init()
 	dw := sstable.DocWord{}
 	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
-		if iterIdx%10 == 0 {
+		if iterIdx%10 == 0 && iterIdx > 0 {
 			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
 		}
 
