@@ -150,7 +150,7 @@ func (m *Uint32Matrix) Deserialize(fn string) error {
 		txt := scanner.Text()
 		if lineIdx == 0 {
 			shape := strings.Split(txt, ",")
-			if len(shape) != 0 {
+			if len(shape) != 2 {
 				return errors.New("model corrupted, shape not found")
 			}
 			row, err := strconv.ParseUint(shape[0], 10, 32)
