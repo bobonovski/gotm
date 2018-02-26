@@ -1,14 +1,6 @@
 package sstable
 
-import (
-	"bufio"
-	"errors"
-	"fmt"
-	"log"
-	"os"
-	"strconv"
-	"strings"
-)
+import "errors"
 
 var (
 	ErrIndexOutOfRange = errors.New("matrix: index out of range")
@@ -105,95 +97,4 @@ func (m *Uint32Matrix) Decr(r, c uint32, val uint32) {
 		panic(ErrIndexOutOfRange)
 	}
 	m.data[r*m.ncol+c] -= val
-}
-
-// serialize data to file
-func (m *Uint32Matrix) Serialize(fn string) error {
-	out, err := os.OpenFile(fn, os.O_WRONLY|os.O_TRUNC|os.O_CREATE, os.ModePerm)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	r, c := m.Shape()
-	if r*c == 0 {
-		return nil
-	}
-	// write the matrix shape
-	out.WriteString(fmt.Sprintf("%d,%d\n", r, c))
-
-	var val uint32
-	for ridx := uint32(0); ridx < r; ridx += 1 {
-		for cidx := uint32(0); cidx < c; cidx += 1 {
-			val = m.Get(ridx, cidx)
-			if val > 0 { // only write out nonzero value
-				out.WriteString(fmt.Sprintf("%d,%d,%d\n", ridx, cidx, val))
-			}
-		}
-	}
-	return nil
-}
-
-// deserialize data from file
-func (m *Uint32Matrix) Deserialize(fn string) error {
-	file, err := os.Open(fn)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	lineIdx := 0
-	var tmp *Uint32Matrix
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		txt := scanner.Text()
-		if lineIdx == 0 {
-			shape := strings.Split(txt, ",")
-			if len(shape) != 2 {
-				return fmt.Errorf("model corrupted, shape not found: %s", txt)
-			}
-			row, err := strconv.ParseUint(shape[0], 10, 32)
-			if err != nil {
-				return err
-			}
-			col, err := strconv.ParseUint(shape[1], 10, 32)
-			if err != nil {
-				return err
-			}
-			tmp = NewUint32Matrix(uint32(row), uint32(col))
-			lineIdx += 1
-			continue
-		}
-
-		value := strings.Split(txt, ",")
-		if len(value) != 3 {
-			log.Printf("data corrupted, row %d, data %s",
-				lineIdx, txt)
-			continue
-		}
-		ridx, err := strconv.ParseUint(value[0], 10, 32)
-		if err != nil {
-			return err
-		}
-		cidx, err := strconv.ParseUint(value[1], 10, 32)
-		if err != nil {
-			return err
-		}
-		val, err := strconv.ParseUint(value[2], 10, 32)
-		if err != nil {
-			return err
-		}
-		tmp.Set(uint32(ridx), uint32(cidx), uint32(val))
-
-		lineIdx += 1
-	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	*m = *tmp
-
-	return nil
 }

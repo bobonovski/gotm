@@ -183,7 +183,7 @@ func (this *LDA) Likelihood() float64 {
 // serialize word-topic distribution
 func (this *LDA) SavePhi(fn string) error {
 	phi := this.Phi()
-	if err := phi.Serialize(fn); err != nil {
+	if err := sstable.Float32Serialize(phi, fn); err != nil {
 		return err
 	}
 	return nil
@@ -192,7 +192,7 @@ func (this *LDA) SavePhi(fn string) error {
 // serialize document-topic distribution
 func (this *LDA) SaveTheta(fn string) error {
 	theta := this.Theta()
-	if err := theta.Serialize(fn); err != nil {
+	if err := sstable.Float32Serialize(theta, fn); err != nil {
 		return err
 	}
 	return nil
@@ -200,7 +200,7 @@ func (this *LDA) SaveTheta(fn string) error {
 
 // serialize word-topic matrix
 func (this *LDA) SaveWordTopic(fn string) error {
-	if err := this.Wt.Serialize(fn); err != nil {
+	if err := sstable.Uint32Serialize(this.Wt, fn); err != nil {
 		return err
 	}
 	return nil
@@ -208,8 +208,10 @@ func (this *LDA) SaveWordTopic(fn string) error {
 
 // deserialize word-topic matrix
 func (this *LDA) LoadWordTopic(fn string) error {
-	if err := this.Wt.Deserialize(fn); err != nil {
+	v, err := sstable.Uint32Deserialize(fn)
+	if err != nil {
 		return err
 	}
+	this.Wt = v
 	return nil
 }

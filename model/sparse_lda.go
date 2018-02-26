@@ -193,7 +193,7 @@ func (this *SparseLDA) Phi() *sstable.Float32Matrix {
 // serialize word-topic distribution
 func (this *SparseLDA) SavePhi(fn string) error {
 	phi := this.Phi()
-	if err := phi.Serialize(fn + ".phi"); err != nil {
+	if err := sstable.Float32Serialize(phi, fn); err != nil {
 		return err
 	}
 	return nil
