@@ -142,7 +142,7 @@ func (m *Uint32Matrix) Deserialize(fn string) error {
 	}
 	defer file.Close()
 
-	var lineIdx int
+	lineIdx := 0
 	var tmp *Uint32Matrix
 
 	scanner := bufio.NewScanner(file)
@@ -151,7 +151,7 @@ func (m *Uint32Matrix) Deserialize(fn string) error {
 		if lineIdx == 0 {
 			shape := strings.Split(txt, ",")
 			if len(shape) != 2 {
-				return errors.New("model corrupted, shape not found")
+				return fmt.Errorf("model corrupted, shape not found: %s", txt)
 			}
 			row, err := strconv.ParseUint(shape[0], 10, 32)
 			if err != nil {
