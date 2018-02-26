@@ -16,10 +16,10 @@ func init() {
 }
 
 type LDA struct {
-	data     *corpus.Corpus
-	alpha    float32 // document topic mixture hyperparameter
-	beta     float32 // topic word mixture hyperparameter
-	topicNum uint32
+	Data     *corpus.Corpus
+	Alpha    float32 // document topic mixture hyperparameter
+	Beta     float32 // topic word mixture hyperparameter
+	TopicNum uint32
 
 	wt  *sstable.Uint32Matrix      // word-topic count table
 	dt  *sstable.Uint32Matrix      // doc-topic count table
@@ -31,10 +31,10 @@ type LDA struct {
 func NewLDA(dat *corpus.Corpus,
 	topicNum uint32, alpha float32, beta float32) Model {
 	return &LDA{
-		data:     dat,
-		alpha:    alpha,
-		beta:     beta,
-		topicNum: topicNum,
+		Data:     dat,
+		Alpha:    alpha,
+		Beta:     beta,
+		TopicNum: topicNum,
 		wt:       sstable.NewUint32Matrix(dat.VocabSize, topicNum),
 		dt:       sstable.NewUint32Matrix(dat.DocNum, topicNum),
 		wts:      sstable.NewUint32Matrix(topicNum, uint32(1)),
@@ -43,17 +43,17 @@ func NewLDA(dat *corpus.Corpus,
 }
 
 func (this *LDA) SetCorpus(dat *corpus.Corpus) {
-	this.data = dat
+	this.Data = dat
 }
 
 func (this *LDA) Init() {
 	// randomly assign topic to word
 	rand.Seed(time.Now().Unix())
 	dw := sstable.DocWord{}
-	for doc, wcs := range this.data.Docs {
+	for doc, wcs := range this.Data.Docs {
 		for i, w := range corpus.ExpandWords(wcs) {
 			// sample word topic
-			k := uint32(rand.Int31n(int32(this.topicNum)))
+			k := uint32(rand.Int31n(int32(this.TopicNum)))
 
 			// update sufficient statistics
 			this.wt.Incr(w, k, uint32(1))
@@ -77,8 +77,8 @@ func (this *LDA) Train(iter int) {
 		}
 
 		// collapsed gibbs sampling
-		cumsum := make([]float32, this.topicNum)
-		for doc, wcs := range this.data.Docs {
+		cumsum := make([]float32, this.TopicNum)
+		for doc, wcs := range this.Data.Docs {
 			for i, w := range corpus.ExpandWords(wcs) {
 				// get the current topic of word w
 				dw.DocId = doc
@@ -91,19 +91,19 @@ func (this *LDA) Train(iter int) {
 				this.wts.Decr(k, uint32(0), uint32(1))
 
 				// resample the topic
-				for kidx := uint32(0); kidx < this.topicNum; kidx += 1 {
-					docPart := this.alpha + float32(this.dt.Get(doc, kidx))
-					wordPart := (this.beta + float32(this.wt.Get(w, kidx))) /
+				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
+					docPart := this.Alpha + float32(this.dt.Get(doc, kidx))
+					wordPart := (this.Beta + float32(this.wt.Get(w, kidx))) /
 						(float32(this.wts.Get(kidx, uint32(0))) +
-							this.beta*float32(this.data.VocabSize))
+							this.Beta*float32(this.Data.VocabSize))
 					if kidx == 0 {
 						cumsum[kidx] = docPart * wordPart
 					} else {
 						cumsum[kidx] = cumsum[kidx-1] + docPart*wordPart
 					}
 				}
-				u := rand.Float32() * cumsum[this.topicNum-1]
-				for kidx := uint32(0); kidx < this.topicNum; kidx += 1 {
+				u := rand.Float32() * cumsum[this.TopicNum-1]
+				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
 					if u < cumsum[kidx] {
 						k = kidx
 						break
@@ -128,14 +128,14 @@ func (this *LDA) Infer(iter int) {
 // compute the posterior point estimation of word-topic mixture
 // beta (Dirichlet prior) + data -> phi
 func (this *LDA) Phi() *sstable.Float32Matrix {
-	phi := sstable.NewFloat32Matrix(this.data.VocabSize, this.topicNum)
+	phi := sstable.NewFloat32Matrix(this.Data.VocabSize, this.TopicNum)
 
-	for k := uint32(0); k < this.topicNum; k += 1 {
+	for k := uint32(0); k < this.TopicNum; k += 1 {
 		sum := sstable.Uint32VectorSum(this.wt.GetCol(k))
 
-		for v := uint32(0); v < this.data.VocabSize; v += 1 {
-			result := (float32(this.wt.Get(v, k)) + this.beta) /
-				(float32(sum) + float32(this.data.VocabSize)*this.beta)
+		for v := uint32(0); v < this.Data.VocabSize; v += 1 {
+			result := (float32(this.wt.Get(v, k)) + this.Beta) /
+				(float32(sum) + float32(this.Data.VocabSize)*this.Beta)
 			phi.Set(v, k, result)
 		}
 	}
@@ -146,14 +146,14 @@ func (this *LDA) Phi() *sstable.Float32Matrix {
 // compute the posterior point estimation of document-topic mixture
 // alpha (Dirichlet prior) + data -> theta
 func (this *LDA) Theta() *sstable.Float32Matrix {
-	theta := sstable.NewFloat32Matrix(this.data.DocNum, this.topicNum)
+	theta := sstable.NewFloat32Matrix(this.Data.DocNum, this.TopicNum)
 
-	for d := uint32(0); d < this.data.DocNum; d += 1 {
+	for d := uint32(0); d < this.Data.DocNum; d += 1 {
 		sum := sstable.Uint32VectorSum(this.dt.GetRow(d))
 
-		for k := uint32(0); k < this.topicNum; k += 1 {
-			result := (float32(this.dt.Get(d, k)) + this.alpha) /
-				(float32(sum) + float32(this.topicNum)*this.alpha)
+		for k := uint32(0); k < this.TopicNum; k += 1 {
+			result := (float32(this.dt.Get(d, k)) + this.Alpha) /
+				(float32(sum) + float32(this.TopicNum)*this.Alpha)
 			theta.Set(d, k, result)
 		}
 	}
@@ -167,10 +167,10 @@ func (this *LDA) Likelihood() float64 {
 	theta := this.Theta()
 
 	sum := float64(0.0)
-	for doc, wcs := range this.data.Docs {
+	for doc, wcs := range this.Data.Docs {
 		for _, w := range corpus.ExpandWords(wcs) {
 			topicSum := float32(0.0)
-			for k := uint32(0); k < this.topicNum; k += 1 {
+			for k := uint32(0); k < this.TopicNum; k += 1 {
 				topicSum += phi.Get(w, k) * theta.Get(doc, k)
 			}
 			sum += math.Log(float64(topicSum))
