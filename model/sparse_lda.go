@@ -16,7 +16,7 @@ func init() {
 
 type SparseLDA struct {
 	*LDA
-	wtm *sstable.SortedMap
+	Wtm *sstable.SortedMap
 }
 
 // NewSparseLDA creates a sparse lda instance with time
@@ -25,22 +25,22 @@ func NewSparseLDA(dat *corpus.Corpus,
 	topicNum uint32, alpha float32, beta float32) Model {
 	return &SparseLDA{
 		LDA: NewLDA(dat, topicNum, alpha, beta).(*LDA),
-		wtm: sstable.NewSortedMap(topicNum),
+		Wtm: sstable.NewSortedMap(topicNum),
 	}
 }
 
 func (this *SparseLDA) Train(iter int) {
 	this.Init()
-	row, col := this.wt.Shape()
+	row, col := this.Wt.Shape()
 	for r := uint32(0); r < row; r += 1 {
 		for c := uint32(0); c < col; c += 1 {
-			cnt := this.wt.Get(r, c)
+			cnt := this.Wt.Get(r, c)
 			if cnt > 0 {
-				this.wtm.Incr(r, c, cnt)
+				this.Wtm.Incr(r, c, cnt)
 			}
 		}
 	}
-	this.wt = nil
+	this.Wt = nil
 
 	dw := sstable.DocWord{}
 
@@ -49,7 +49,7 @@ func (this *SparseLDA) Train(iter int) {
 	for k := uint32(0); k < this.TopicNum; k += 1 {
 		smoothingBucket += (this.Alpha * this.Beta) /
 			(this.Beta*float32(this.Data.VocabSize) +
-				float32(this.wts.Get(k, uint32(0))))
+				float32(this.Wts.Get(k, uint32(0))))
 	}
 
 	// word-topic bucket cache
@@ -65,42 +65,42 @@ func (this *SparseLDA) Train(iter int) {
 			docTopicBucket := float32(0.0)
 
 			for k := uint32(0); k < this.TopicNum; k += 1 {
-				docTopicBucket += (this.Beta * float32(this.dt.Get(doc, k))) /
+				docTopicBucket += (this.Beta * float32(this.Dt.Get(doc, k))) /
 					(this.Beta*float32(this.Data.VocabSize) +
-						float32(this.wts.Get(k, uint32(0))))
-				wtbCache[k] = (this.Alpha + float32(this.dt.Get(doc, k))) /
+						float32(this.Wts.Get(k, uint32(0))))
+				wtbCache[k] = (this.Alpha + float32(this.Dt.Get(doc, k))) /
 					(this.Beta*float32(this.Data.VocabSize) +
-						float32(this.wts.Get(k, uint32(0))))
+						float32(this.Wts.Get(k, uint32(0))))
 			}
 
 			for i, w := range corpus.ExpandWords(wcs) {
 				// get the current topic of word w
 				dw.DocId = doc
 				dw.WordIdx = uint32(i)
-				k := this.dwt[dw]
+				k := this.Dwt[dw]
 
 				// subtract old value from buckets
 				denom := (this.Beta*float32(this.Data.VocabSize) +
-					float32(this.wts.Get(k, uint32(0))))
+					float32(this.Wts.Get(k, uint32(0))))
 				smoothingBucket -= (this.Alpha * this.Beta) / denom
-				docTopicBucket -= (this.Beta * float32(this.dt.Get(doc, k))) / denom
+				docTopicBucket -= (this.Beta * float32(this.Dt.Get(doc, k))) / denom
 
 				// decrease corresponding sufficient statistics
-				this.wtm.Decr(w, k, uint32(1))
-				this.dt.Decr(doc, k, uint32(1))
-				this.wts.Decr(k, uint32(0), uint32(1))
+				this.Wtm.Decr(w, k, uint32(1))
+				this.Dt.Decr(doc, k, uint32(1))
+				this.Wts.Decr(k, uint32(0), uint32(1))
 
 				// update bucket values
 				denom = (this.Beta*float32(this.Data.VocabSize) +
-					float32(this.wts.Get(k, uint32(0))))
+					float32(this.Wts.Get(k, uint32(0))))
 				smoothingBucket += (this.Alpha * this.Beta) / denom
-				docTopicBucket += (this.Beta * float32(this.dt.Get(doc, k))) / denom
-				wtbCache[k] = (this.Alpha + float32(this.dt.Get(doc, k))) / denom
+				docTopicBucket += (this.Beta * float32(this.Dt.Get(doc, k))) / denom
+				wtbCache[k] = (this.Alpha + float32(this.Dt.Get(doc, k))) / denom
 
 				// compute word-topic bucket sum
 				wtbSum := float32(0.0)
-				for idx, _ := range this.wtm.Data[w] {
-					tid, count := this.wtm.Get(w, idx)
+				for idx, _ := range this.Wtm.Data[w] {
+					tid, count := this.Wtm.Get(w, idx)
 					wtbSum += wtbCache[tid] * float32(count)
 				}
 				dtbSum := docTopicBucket
@@ -111,8 +111,8 @@ func (this *SparseLDA) Train(iter int) {
 				u := rand.Float32() * (wtbSum + dtbSum + sbSum)
 				if u < wtbSum { // topic-word bucket
 					cumsum = 0.0
-					for tcIdx, _ := range this.wtm.Data[w] {
-						tid, count := this.wtm.Get(w, tcIdx)
+					for tcIdx, _ := range this.Wtm.Data[w] {
+						tid, count := this.Wtm.Get(w, tcIdx)
 						cumsum += wtbCache[tid] * float32(count)
 						if cumsum >= u {
 							k = tid
@@ -123,7 +123,7 @@ func (this *SparseLDA) Train(iter int) {
 					cumsum = 0.0
 					u = u - wtbSum
 					for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
-						cumsum += (this.Beta * float32(this.dt.Get(doc, k))) / denom
+						cumsum += (this.Beta * float32(this.Dt.Get(doc, k))) / denom
 						if cumsum >= u {
 							k = kidx
 							break
@@ -141,22 +141,22 @@ func (this *SparseLDA) Train(iter int) {
 				}
 
 				denom = (this.Beta*float32(this.Data.VocabSize) +
-					float32(this.wts.Get(k, uint32(0))))
+					float32(this.Wts.Get(k, uint32(0))))
 				smoothingBucket -= (this.Alpha * this.Beta) / denom
-				docTopicBucket -= (this.Beta * float32(this.dt.Get(doc, k))) / denom
+				docTopicBucket -= (this.Beta * float32(this.Dt.Get(doc, k))) / denom
 
 				// increase corresponding sufficient statistics
-				this.wtm.Incr(w, k, uint32(1))
-				this.dt.Incr(doc, k, uint32(1))
-				this.wts.Incr(k, uint32(0), uint32(1))
-				this.dwt[dw] = k
+				this.Wtm.Incr(w, k, uint32(1))
+				this.Dt.Incr(doc, k, uint32(1))
+				this.Wts.Incr(k, uint32(0), uint32(1))
+				this.Dwt[dw] = k
 
 				// update bucket values
 				denom = (this.Beta*float32(this.Data.VocabSize) +
-					float32(this.wts.Get(k, uint32(0))))
+					float32(this.Wts.Get(k, uint32(0))))
 				smoothingBucket += (this.Alpha * this.Beta) / denom
-				docTopicBucket += (this.Beta * float32(this.dt.Get(doc, k))) / denom
-				wtbCache[k] = (this.Alpha + float32(this.dt.Get(doc, k))) / denom
+				docTopicBucket += (this.Beta * float32(this.Dt.Get(doc, k))) / denom
+				wtbCache[k] = (this.Alpha + float32(this.Dt.Get(doc, k))) / denom
 			}
 		}
 	}
@@ -175,13 +175,13 @@ func (this *SparseLDA) Phi() *sstable.Float32Matrix {
 	for w := uint32(0); w < this.Data.VocabSize; w += 1 {
 		// convert sparse vector to dense vector
 		wordTopicCount := make([]uint32, this.TopicNum)
-		for tcIdx, _ := range this.wtm.Data[w] {
-			topicId, count := this.wtm.Get(w, tcIdx)
+		for tcIdx, _ := range this.Wtm.Data[w] {
+			topicId, count := this.Wtm.Get(w, tcIdx)
 			wordTopicCount[topicId] = count
 		}
 		for k := uint32(0); k < this.TopicNum; k += 1 {
 			result := (float32(wordTopicCount[k]) + this.Beta) /
-				(float32(this.wts.Get(k, uint32(0))) +
+				(float32(this.Wts.Get(k, uint32(0))) +
 					float32(this.Data.VocabSize)*this.Beta)
 			phi.Set(w, k, result)
 		}
@@ -220,7 +220,7 @@ func (this *SparseLDA) Likelihood() float64 {
 
 // serialize word-topic matrix
 func (this *SparseLDA) SaveWordTopic(fn string) error {
-	if err := this.wtm.Serialize(fn); err != nil {
+	if err := this.Wtm.Serialize(fn); err != nil {
 		return err
 	}
 	return nil
@@ -228,7 +228,7 @@ func (this *SparseLDA) SaveWordTopic(fn string) error {
 
 // deserialize word-topic matrix
 func (this *SparseLDA) LoadWordTopic(fn string) error {
-	if err := this.wtm.Deserialize(fn); err != nil {
+	if err := this.Wtm.Deserialize(fn); err != nil {
 		return err
 	}
 	return nil

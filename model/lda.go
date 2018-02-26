@@ -21,10 +21,10 @@ type LDA struct {
 	Beta     float32 // topic word mixture hyperparameter
 	TopicNum uint32
 
-	wt  *sstable.Uint32Matrix      // word-topic count table
-	dt  *sstable.Uint32Matrix      // doc-topic count table
-	wts *sstable.Uint32Matrix      // word-topic-sum count table
-	dwt map[sstable.DocWord]uint32 // doc-word-topic map
+	Wt  *sstable.Uint32Matrix      // word-topic count table
+	Dt  *sstable.Uint32Matrix      // doc-topic count table
+	Wts *sstable.Uint32Matrix      // word-topic-sum count table
+	Dwt map[sstable.DocWord]uint32 // doc-word-topic map
 }
 
 // New creates a LDA instance with collapsed gibbs sampler
@@ -35,10 +35,10 @@ func NewLDA(dat *corpus.Corpus,
 		Alpha:    alpha,
 		Beta:     beta,
 		TopicNum: topicNum,
-		wt:       sstable.NewUint32Matrix(dat.VocabSize, topicNum),
-		dt:       sstable.NewUint32Matrix(dat.DocNum, topicNum),
-		wts:      sstable.NewUint32Matrix(topicNum, uint32(1)),
-		dwt:      make(map[sstable.DocWord]uint32),
+		Wt:       sstable.NewUint32Matrix(dat.VocabSize, topicNum),
+		Dt:       sstable.NewUint32Matrix(dat.DocNum, topicNum),
+		Wts:      sstable.NewUint32Matrix(topicNum, uint32(1)),
+		Dwt:      make(map[sstable.DocWord]uint32),
 	}
 }
 
@@ -56,14 +56,14 @@ func (this *LDA) Init() {
 			k := uint32(rand.Int31n(int32(this.TopicNum)))
 
 			// update sufficient statistics
-			this.wt.Incr(w, k, uint32(1))
-			this.dt.Incr(doc, k, uint32(1))
-			this.wts.Incr(k, uint32(0), uint32(1))
+			this.Wt.Incr(w, k, uint32(1))
+			this.Dt.Incr(doc, k, uint32(1))
+			this.Wts.Incr(k, uint32(0), uint32(1))
 
 			// update doc word topic assignment
 			dw.DocId = doc
 			dw.WordIdx = uint32(i)
-			this.dwt[dw] = k
+			this.Dwt[dw] = k
 		}
 	}
 }
@@ -83,18 +83,18 @@ func (this *LDA) Train(iter int) {
 				// get the current topic of word w
 				dw.DocId = doc
 				dw.WordIdx = uint32(i)
-				k := this.dwt[dw]
+				k := this.Dwt[dw]
 
 				// decrease corresponding sufficient statistics
-				this.wt.Decr(w, k, uint32(1))
-				this.dt.Decr(doc, k, uint32(1))
-				this.wts.Decr(k, uint32(0), uint32(1))
+				this.Wt.Decr(w, k, uint32(1))
+				this.Dt.Decr(doc, k, uint32(1))
+				this.Wts.Decr(k, uint32(0), uint32(1))
 
 				// resample the topic
 				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
-					docPart := this.Alpha + float32(this.dt.Get(doc, kidx))
-					wordPart := (this.Beta + float32(this.wt.Get(w, kidx))) /
-						(float32(this.wts.Get(kidx, uint32(0))) +
+					docPart := this.Alpha + float32(this.Dt.Get(doc, kidx))
+					wordPart := (this.Beta + float32(this.Wt.Get(w, kidx))) /
+						(float32(this.Wts.Get(kidx, uint32(0))) +
 							this.Beta*float32(this.Data.VocabSize))
 					if kidx == 0 {
 						cumsum[kidx] = docPart * wordPart
@@ -111,10 +111,10 @@ func (this *LDA) Train(iter int) {
 				}
 
 				// increase corresponding sufficient statistics
-				this.wt.Incr(w, k, uint32(1))
-				this.dt.Incr(doc, k, uint32(1))
-				this.wts.Incr(k, uint32(0), uint32(1))
-				this.dwt[dw] = k
+				this.Wt.Incr(w, k, uint32(1))
+				this.Dt.Incr(doc, k, uint32(1))
+				this.Wts.Incr(k, uint32(0), uint32(1))
+				this.Dwt[dw] = k
 			}
 		}
 	}
@@ -131,10 +131,10 @@ func (this *LDA) Phi() *sstable.Float32Matrix {
 	phi := sstable.NewFloat32Matrix(this.Data.VocabSize, this.TopicNum)
 
 	for k := uint32(0); k < this.TopicNum; k += 1 {
-		sum := sstable.Uint32VectorSum(this.wt.GetCol(k))
+		sum := sstable.Uint32VectorSum(this.Wt.GetCol(k))
 
 		for v := uint32(0); v < this.Data.VocabSize; v += 1 {
-			result := (float32(this.wt.Get(v, k)) + this.Beta) /
+			result := (float32(this.Wt.Get(v, k)) + this.Beta) /
 				(float32(sum) + float32(this.Data.VocabSize)*this.Beta)
 			phi.Set(v, k, result)
 		}
@@ -149,10 +149,10 @@ func (this *LDA) Theta() *sstable.Float32Matrix {
 	theta := sstable.NewFloat32Matrix(this.Data.DocNum, this.TopicNum)
 
 	for d := uint32(0); d < this.Data.DocNum; d += 1 {
-		sum := sstable.Uint32VectorSum(this.dt.GetRow(d))
+		sum := sstable.Uint32VectorSum(this.Dt.GetRow(d))
 
 		for k := uint32(0); k < this.TopicNum; k += 1 {
-			result := (float32(this.dt.Get(d, k)) + this.Alpha) /
+			result := (float32(this.Dt.Get(d, k)) + this.Alpha) /
 				(float32(sum) + float32(this.TopicNum)*this.Alpha)
 			theta.Set(d, k, result)
 		}
@@ -200,7 +200,7 @@ func (this *LDA) SaveTheta(fn string) error {
 
 // serialize word-topic matrix
 func (this *LDA) SaveWordTopic(fn string) error {
-	if err := this.wt.Serialize(fn); err != nil {
+	if err := this.Wt.Serialize(fn); err != nil {
 		return err
 	}
 	return nil
@@ -208,7 +208,7 @@ func (this *LDA) SaveWordTopic(fn string) error {
 
 // deserialize word-topic matrix
 func (this *LDA) LoadWordTopic(fn string) error {
-	if err := this.wt.Deserialize(fn); err != nil {
+	if err := this.Wt.Deserialize(fn); err != nil {
 		return err
 	}
 	return nil
