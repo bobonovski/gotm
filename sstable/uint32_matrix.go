@@ -1,6 +1,9 @@
 package sstable
 
-import "errors"
+import (
+	"errors"
+	"sync/atomic"
+)
 
 var (
 	ErrIndexOutOfRange = errors.New("matrix: index out of range")
@@ -46,7 +49,7 @@ func (m *Uint32Matrix) Get(r, c uint32) uint32 {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
-	return m.data[r*m.ncol+c]
+	return atomic.LoadUint32(&m.data[r*m.ncol+c])
 }
 
 // get the r-th row of the matrix
@@ -80,7 +83,7 @@ func (m *Uint32Matrix) Set(r, c uint32, val uint32) {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
-	m.data[r*m.ncol+c] = val
+	atomic.StoreUint32(&m.data[r*m.ncol+c], val)
 }
 
 // increment the [r, c]-th element of the matrix by val
@@ -88,7 +91,7 @@ func (m *Uint32Matrix) Incr(r, c uint32, val uint32) {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
-	m.data[r*m.ncol+c] += val
+	atomic.AddUint32(&m.data[r*m.ncol+c], val)
 }
 
 // decrement the [r, c]-th element of the matrix by val
@@ -96,5 +99,5 @@ func (m *Uint32Matrix) Decr(r, c uint32, val uint32) {
 	if r >= m.nrow || c >= m.ncol {
 		panic(ErrIndexOutOfRange)
 	}
-	m.data[r*m.ncol+c] -= val
+	atomic.AddUint32(&m.data[r*m.ncol+c], ^uint32(val-1))
 }
