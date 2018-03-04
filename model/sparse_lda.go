@@ -21,16 +21,24 @@ type SparseLDA struct {
 
 // NewSparseLDA creates a sparse lda instance with time
 // and memory efficient gibbs sampler
-func NewSparseLDA(dat *corpus.Corpus,
-	topicNum uint32, alpha float32, beta float32) Model {
+func NewSparseLDA(topicNum uint32, alpha float32, beta float32) Model {
 	return &SparseLDA{
-		LDA: NewLDA(dat, topicNum, alpha, beta).(*LDA),
+		LDA: NewLDA(topicNum, alpha, beta).(*LDA),
 		Wtm: sstable.NewSortedMap(topicNum),
 	}
 }
 
-func (this *SparseLDA) Train(iter int) {
+func (this *SparseLDA) Train(dat *corpus.Corpus, iter int) {
+	// create sstables
+	this.Wt = sstable.NewUint32Matrix(dat.VocabSize, this.TopicNum)
+	this.Dt = sstable.NewUint32Matrix(dat.DocNum, this.TopicNum)
+	this.Wts = sstable.NewUint32Matrix(this.TopicNum, uint32(1))
+	this.Dwt = make(map[sstable.DocWord]uint32)
+	this.Data = dat
+
+	// randomly init sstables
 	this.Init()
+
 	row, col := this.Wt.Shape()
 	for r := uint32(0); r < row; r += 1 {
 		for c := uint32(0); c < col; c += 1 {
@@ -163,8 +171,8 @@ func (this *SparseLDA) Train(iter int) {
 }
 
 // infer topics on new documents
-func (this *SparseLDA) Infer(iter int) {
-	this.Train(iter)
+func (this *SparseLDA) Infer(dat *corpus.Corpus, iter int) {
+	this.Train(dat, iter)
 }
 
 // compute the posterior point estimation of word-topic mixture

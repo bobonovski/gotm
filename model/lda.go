@@ -16,10 +16,11 @@ func init() {
 }
 
 type LDA struct {
-	Data     *corpus.Corpus
 	Alpha    float32 // document topic mixture hyperparameter
 	Beta     float32 // topic word mixture hyperparameter
 	TopicNum uint32
+
+	Data *corpus.Corpus // for convenience
 
 	Wt  *sstable.Uint32Matrix      // word-topic count table
 	Dt  *sstable.Uint32Matrix      // doc-topic count table
@@ -28,22 +29,12 @@ type LDA struct {
 }
 
 // New creates a LDA instance with collapsed gibbs sampler
-func NewLDA(dat *corpus.Corpus,
-	topicNum uint32, alpha float32, beta float32) Model {
+func NewLDA(topicNum uint32, alpha float32, beta float32) Model {
 	return &LDA{
-		Data:     dat,
 		Alpha:    alpha,
 		Beta:     beta,
 		TopicNum: topicNum,
-		Wt:       sstable.NewUint32Matrix(dat.VocabSize, topicNum),
-		Dt:       sstable.NewUint32Matrix(dat.DocNum, topicNum),
-		Wts:      sstable.NewUint32Matrix(topicNum, uint32(1)),
-		Dwt:      make(map[sstable.DocWord]uint32),
 	}
-}
-
-func (this *LDA) SetCorpus(dat *corpus.Corpus) {
-	this.Data = dat
 }
 
 func (this *LDA) Init() {
@@ -68,61 +59,91 @@ func (this *LDA) Init() {
 	}
 }
 
-func (this *LDA) Train(iter int) {
-	this.Init()
+func (this *LDA) ResampleTopics() {
+	// collapsed gibbs sampling
+	cumsum := make([]float32, this.TopicNum)
 	dw := sstable.DocWord{}
-	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
-		if iterIdx%10 == 0 && iterIdx > 0 {
-			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
-		}
+	for doc, wcs := range this.Data.Docs {
+		for i, w := range corpus.ExpandWords(wcs) {
+			// get the current topic of word w
+			dw.DocId = doc
+			dw.WordIdx = uint32(i)
+			k := this.Dwt[dw]
 
-		// collapsed gibbs sampling
-		cumsum := make([]float32, this.TopicNum)
-		for doc, wcs := range this.Data.Docs {
-			for i, w := range corpus.ExpandWords(wcs) {
-				// get the current topic of word w
-				dw.DocId = doc
-				dw.WordIdx = uint32(i)
-				k := this.Dwt[dw]
+			// decrease corresponding sufficient statistics
+			this.Wt.Decr(w, k, uint32(1))
+			this.Dt.Decr(doc, k, uint32(1))
+			this.Wts.Decr(k, uint32(0), uint32(1))
 
-				// decrease corresponding sufficient statistics
-				this.Wt.Decr(w, k, uint32(1))
-				this.Dt.Decr(doc, k, uint32(1))
-				this.Wts.Decr(k, uint32(0), uint32(1))
-
-				// resample the topic
-				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
-					docPart := this.Alpha + float32(this.Dt.Get(doc, kidx))
-					wordPart := (this.Beta + float32(this.Wt.Get(w, kidx))) /
-						(float32(this.Wts.Get(kidx, uint32(0))) +
-							this.Beta*float32(this.Data.VocabSize))
-					if kidx == 0 {
-						cumsum[kidx] = docPart * wordPart
-					} else {
-						cumsum[kidx] = cumsum[kidx-1] + docPart*wordPart
-					}
+			// resample the topic
+			for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
+				docPart := this.Alpha + float32(this.Dt.Get(doc, kidx))
+				wordPart := (this.Beta + float32(this.Wt.Get(w, kidx))) /
+					(float32(this.Wts.Get(kidx, uint32(0))) +
+						this.Beta*float32(this.Data.VocabSize))
+				if kidx == 0 {
+					cumsum[kidx] = docPart * wordPart
+				} else {
+					cumsum[kidx] = cumsum[kidx-1] + docPart*wordPart
 				}
-				u := rand.Float32() * cumsum[this.TopicNum-1]
-				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
-					if u < cumsum[kidx] {
-						k = kidx
-						break
-					}
-				}
-
-				// increase corresponding sufficient statistics
-				this.Wt.Incr(w, k, uint32(1))
-				this.Dt.Incr(doc, k, uint32(1))
-				this.Wts.Incr(k, uint32(0), uint32(1))
-				this.Dwt[dw] = k
 			}
+			u := rand.Float32() * cumsum[this.TopicNum-1]
+			for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
+				if u < cumsum[kidx] {
+					k = kidx
+					break
+				}
+			}
+
+			// increase corresponding sufficient statistics
+			this.Wt.Incr(w, k, uint32(1))
+			this.Dt.Incr(doc, k, uint32(1))
+			this.Wts.Incr(k, uint32(0), uint32(1))
+			this.Dwt[dw] = k
 		}
 	}
 }
 
+func (this *LDA) Train(dat *corpus.Corpus, iter int) {
+	if dat == nil {
+		log.Fatal("corpus is nil")
+	}
+	// create sstables
+	this.Wt = sstable.NewUint32Matrix(dat.VocabSize, this.TopicNum)
+	this.Dt = sstable.NewUint32Matrix(dat.DocNum, this.TopicNum)
+	this.Wts = sstable.NewUint32Matrix(this.TopicNum, uint32(1))
+	this.Dwt = make(map[sstable.DocWord]uint32)
+	this.Data = dat
+
+	// randomly init sstables
+	this.Init()
+
+	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
+		if iterIdx%10 == 0 && iterIdx > 0 {
+			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
+		}
+		this.ResampleTopics()
+	}
+}
+
 // infer topics on new documents
-func (this *LDA) Infer(iter int) {
-	this.Train(iter)
+func (this *LDA) Infer(dat *corpus.Corpus, iter int) {
+	if dat == nil {
+		log.Fatal("corpus is nil")
+	}
+	if this.Wt == nil || this.Wts == nil {
+		log.Fatal("Wt or Wts is not initialized, maybe model is not loaded")
+	}
+	// Wt, Wts should be initialized when model was loaded
+	this.Dt = sstable.NewUint32Matrix(dat.DocNum, this.TopicNum)
+	this.Dwt = make(map[sstable.DocWord]uint32)
+	this.Data = dat
+	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
+		if iterIdx%10 == 0 && iterIdx > 0 {
+			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
+		}
+		this.ResampleTopics()
+	}
 }
 
 // compute the posterior point estimation of word-topic mixture
@@ -213,5 +234,13 @@ func (this *LDA) LoadWordTopic(fn string) error {
 		return err
 	}
 	this.Wt = v
+	// init WordTopicSum table
+	this.Wts = sstable.NewUint32Matrix(this.TopicNum, uint32(1))
+	vocab, topicNum := this.Wt.Shape()
+	for r := uint32(0); r < vocab; r += 1 {
+		for t := uint32(0); t < topicNum; t += 1 {
+			this.Wts.Incr(t, uint32(0), this.Wts.Get(r, t))
+		}
+	}
 	return nil
 }

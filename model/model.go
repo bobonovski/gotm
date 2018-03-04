@@ -12,9 +12,9 @@ var constructors = make(map[string]ModelCtor)
 // the common interface new LDA samplers should follow
 type Model interface {
 	// train model for iter iteration
-	Train(iter int)
+	Train(dat *corpus.Corpus, iter int)
 	// do inference for new doc for iter iteration
-	Infer(iter int)
+	Infer(dat *corpus.Corpus, iter int)
 	// get doc-topic distribution
 	Phi() *sstable.Float32Matrix
 	// get word-topic distribution
@@ -34,7 +34,7 @@ func Register(modelType string, m ModelCtor) {
 	constructors[modelType] = m
 }
 
-type ModelCtor func(dat *corpus.Corpus, topicNum uint32, alpha float32, beta float32) Model
+type ModelCtor func(topicNum uint32, alpha float32, beta float32) Model
 
 func GetModel(modelType string) (ModelCtor, error) {
 	if _, ok := constructors[modelType]; !ok {

@@ -32,12 +32,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	m := ctor(data, uint32(*topicNum), float32(*alpha), float32(*beta))
+	m := ctor(uint32(*topicNum), float32(*alpha), float32(*beta))
 
 	if *infer == false {
 		log.Infof("training for new %s model", *modelType)
 		// train model
-		m.Train(*iteration)
+		m.Train(data, *iteration)
 		// save document-topic distribution
 		m.SaveTheta(*modelName)
 		// save word-topic distribution
@@ -49,7 +49,7 @@ func main() {
 		// load word-topic matrix
 		m.LoadWordTopic(*modelName)
 		// infer document topics
-		m.Infer(*iteration)
+		m.Infer(data, *iteration)
 		// save document-topic distribution
 		m.SaveTheta(*modelName)
 	}
