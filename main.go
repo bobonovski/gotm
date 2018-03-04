@@ -39,18 +39,21 @@ func main() {
 		// train model
 		m.Train(data, *iteration)
 		// save document-topic distribution
-		m.SaveTheta(*modelName)
+		m.SaveTheta(*modelName + ".theta")
 		// save word-topic distribution
-		m.SavePhi(*modelName)
+		m.SavePhi(*modelName + ".phi")
 		// save word-topic matrix
-		m.SaveWordTopic(*modelName)
+		m.SaveWordTopic(*modelName + ".wt")
 	} else {
 		log.Infof("infer for new docs")
 		// load word-topic matrix
-		m.LoadWordTopic(*modelName)
+		err := m.LoadWordTopic(*modelName + ".wt")
+		if err != nil {
+			log.Fatal(err)
+		}
 		// infer document topics
 		m.Infer(data, *iteration)
 		// save document-topic distribution
-		m.SaveTheta(*modelName)
+		m.SaveTheta(*modelName + ".theta")
 	}
 }

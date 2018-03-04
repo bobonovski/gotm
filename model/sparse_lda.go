@@ -28,28 +28,7 @@ func NewSparseLDA(topicNum uint32, alpha float32, beta float32) Model {
 	}
 }
 
-func (this *SparseLDA) Train(dat *corpus.Corpus, iter int) {
-	// create sstables
-	this.Wt = sstable.NewUint32Matrix(dat.VocabSize, this.TopicNum)
-	this.Dt = sstable.NewUint32Matrix(dat.DocNum, this.TopicNum)
-	this.Wts = sstable.NewUint32Matrix(this.TopicNum, uint32(1))
-	this.Dwt = make(map[sstable.DocWord]uint32)
-	this.Data = dat
-
-	// randomly init sstables
-	this.Init()
-
-	row, col := this.Wt.Shape()
-	for r := uint32(0); r < row; r += 1 {
-		for c := uint32(0); c < col; c += 1 {
-			cnt := this.Wt.Get(r, c)
-			if cnt > 0 {
-				this.Wtm.Incr(r, c, cnt)
-			}
-		}
-	}
-	this.Wt = nil
-
+func (this *SparseLDA) ResampleTopics(iter int) {
 	dw := sstable.DocWord{}
 
 	// compute smoothing bucket
@@ -170,9 +149,34 @@ func (this *SparseLDA) Train(dat *corpus.Corpus, iter int) {
 	}
 }
 
+func (this *SparseLDA) Train(dat *corpus.Corpus, iter int) {
+	// create sstables
+	this.Wt = sstable.NewUint32Matrix(dat.VocabSize, this.TopicNum)
+	this.Dt = sstable.NewUint32Matrix(dat.DocNum, this.TopicNum)
+	this.Wts = sstable.NewUint32Matrix(this.TopicNum, uint32(1))
+	this.Dwt = make(map[sstable.DocWord]uint32)
+	this.Data = dat
+
+	// randomly init sstables
+	this.Init()
+
+	row, col := this.Wt.Shape()
+	for r := uint32(0); r < row; r += 1 {
+		for c := uint32(0); c < col; c += 1 {
+			cnt := this.Wt.Get(r, c)
+			if cnt > 0 {
+				this.Wtm.Incr(r, c, cnt)
+			}
+		}
+	}
+	this.Wt = nil
+
+	this.ResampleTopics(iter)
+}
+
 // infer topics on new documents
 func (this *SparseLDA) Infer(dat *corpus.Corpus, iter int) {
-	this.Train(dat, iter)
+	// TODO
 }
 
 // compute the posterior point estimation of word-topic mixture

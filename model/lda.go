@@ -59,47 +59,55 @@ func (this *LDA) Init() {
 	}
 }
 
-func (this *LDA) ResampleTopics() {
-	// collapsed gibbs sampling
-	cumsum := make([]float32, this.TopicNum)
+func (this *LDA) ResampleTopics(iter int) {
 	dw := sstable.DocWord{}
-	for doc, wcs := range this.Data.Docs {
-		for i, w := range corpus.ExpandWords(wcs) {
-			// get the current topic of word w
-			dw.DocId = doc
-			dw.WordIdx = uint32(i)
-			k := this.Dwt[dw]
+	cumsum := make([]float32, this.TopicNum)
 
-			// decrease corresponding sufficient statistics
-			this.Wt.Decr(w, k, uint32(1))
-			this.Dt.Decr(doc, k, uint32(1))
-			this.Wts.Decr(k, uint32(0), uint32(1))
-
-			// resample the topic
-			for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
-				docPart := this.Alpha + float32(this.Dt.Get(doc, kidx))
-				wordPart := (this.Beta + float32(this.Wt.Get(w, kidx))) /
-					(float32(this.Wts.Get(kidx, uint32(0))) +
-						this.Beta*float32(this.Data.VocabSize))
-				if kidx == 0 {
-					cumsum[kidx] = docPart * wordPart
-				} else {
-					cumsum[kidx] = cumsum[kidx-1] + docPart*wordPart
-				}
+	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
+		if log.V(5) {
+			if iterIdx%10 == 0 {
+				log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
 			}
-			u := rand.Float32() * cumsum[this.TopicNum-1]
-			for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
-				if u < cumsum[kidx] {
-					k = kidx
-					break
-				}
-			}
+		}
+		// collapsed gibbs sampling
+		for doc, wcs := range this.Data.Docs {
+			for i, w := range corpus.ExpandWords(wcs) {
+				// get the current topic of word w
+				dw.DocId = doc
+				dw.WordIdx = uint32(i)
+				k := this.Dwt[dw]
 
-			// increase corresponding sufficient statistics
-			this.Wt.Incr(w, k, uint32(1))
-			this.Dt.Incr(doc, k, uint32(1))
-			this.Wts.Incr(k, uint32(0), uint32(1))
-			this.Dwt[dw] = k
+				// decrease corresponding sufficient statistics
+				this.Wt.Decr(w, k, uint32(1))
+				this.Dt.Decr(doc, k, uint32(1))
+				this.Wts.Decr(k, uint32(0), uint32(1))
+
+				// resample the topic
+				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
+					docPart := this.Alpha + float32(this.Dt.Get(doc, kidx))
+					wordPart := (this.Beta + float32(this.Wt.Get(w, kidx))) /
+						(float32(this.Wts.Get(kidx, uint32(0))) +
+							this.Beta*float32(this.Data.VocabSize))
+					if kidx == 0 {
+						cumsum[kidx] = docPart * wordPart
+					} else {
+						cumsum[kidx] = cumsum[kidx-1] + docPart*wordPart
+					}
+				}
+				u := rand.Float32() * cumsum[this.TopicNum-1]
+				for kidx := uint32(0); kidx < this.TopicNum; kidx += 1 {
+					if u < cumsum[kidx] {
+						k = kidx
+						break
+					}
+				}
+
+				// increase corresponding sufficient statistics
+				this.Wt.Incr(w, k, uint32(1))
+				this.Dt.Incr(doc, k, uint32(1))
+				this.Wts.Incr(k, uint32(0), uint32(1))
+				this.Dwt[dw] = k
+			}
 		}
 	}
 }
@@ -118,12 +126,7 @@ func (this *LDA) Train(dat *corpus.Corpus, iter int) {
 	// randomly init sstables
 	this.Init()
 
-	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
-		if iterIdx%10 == 0 && iterIdx > 0 {
-			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
-		}
-		this.ResampleTopics()
-	}
+	this.ResampleTopics(iter)
 }
 
 // infer topics on new documents
@@ -138,12 +141,11 @@ func (this *LDA) Infer(dat *corpus.Corpus, iter int) {
 	this.Dt = sstable.NewUint32Matrix(dat.DocNum, this.TopicNum)
 	this.Dwt = make(map[sstable.DocWord]uint32)
 	this.Data = dat
-	for iterIdx := 0; iterIdx < iter; iterIdx += 1 {
-		if iterIdx%10 == 0 && iterIdx > 0 {
-			log.Infof("iter %5d, likelihood %f", iterIdx, this.Likelihood())
-		}
-		this.ResampleTopics()
-	}
+
+	// randomly init sstables
+	this.Init()
+
+	this.ResampleTopics(iter)
 }
 
 // compute the posterior point estimation of word-topic mixture
@@ -237,9 +239,10 @@ func (this *LDA) LoadWordTopic(fn string) error {
 	// init WordTopicSum table
 	this.Wts = sstable.NewUint32Matrix(this.TopicNum, uint32(1))
 	vocab, topicNum := this.Wt.Shape()
+	log.Infof("%d,%d", vocab, topicNum)
 	for r := uint32(0); r < vocab; r += 1 {
 		for t := uint32(0); t < topicNum; t += 1 {
-			this.Wts.Incr(t, uint32(0), this.Wts.Get(r, t))
+			this.Wts.Incr(t, uint32(0), this.Wt.Get(r, t))
 		}
 	}
 	return nil
