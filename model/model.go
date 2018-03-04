@@ -27,8 +27,6 @@ type Model interface {
 	SaveWordTopic(fn string) error
 	// deserialize word topic count table
 	LoadWordTopic(fn string) error
-	// set corpus
-	SetCorpus(dat *corpus.Corpus)
 }
 
 // new LDA sampler should register itself using this function
