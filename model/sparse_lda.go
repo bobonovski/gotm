@@ -160,6 +160,8 @@ func (this *SparseLDA) Train(dat *corpus.Corpus, iter int) {
 	// randomly init sstables
 	this.Init()
 
+	// for SparseLDA, WordTopicCount table is replaced by WordTopicMap
+	// but we use initialized WordTopicCount to initialize WordTopicMap
 	row, col := this.Wt.Shape()
 	for r := uint32(0); r < row; r += 1 {
 		for c := uint32(0); c < col; c += 1 {
